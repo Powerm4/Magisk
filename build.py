@@ -85,9 +85,9 @@ rust_bin = op.join(ndk_path, "toolchains", "rust", "bin")
 llvm_bin = op.join(
     ndk_path, "toolchains", "llvm", "prebuilt", f"{os_name}-x86_64", "bin"
 )
-cargo = op.join(rust_bin, "cargo" + EXE_EXT)
+cargo = op.join(rust_bin, f"cargo{EXE_EXT}")
 gradlew = op.join(".", "gradlew" + (".bat" if is_windows else ""))
-adb_path = op.join(sdk_path, "platform-tools", "adb" + EXE_EXT)
+adb_path = op.join(sdk_path, "platform-tools", f"adb{EXE_EXT}")
 native_gen_path = op.realpath(op.join("native", "out", "generated"))
 
 # Global vars
@@ -236,7 +236,7 @@ def clean_elf():
 
 def run_ndk_build(flags):
     os.chdir("native")
-    flags = "NDK_PROJECT_PATH=. NDK_APPLICATION_MK=src/Application.mk " + flags
+    flags = f"NDK_PROJECT_PATH=. NDK_APPLICATION_MK=src/Application.mk {flags}"
     proc = system(f"{ndk_build} {flags} -j{cpu_count}")
     if proc.returncode != 0:
         error("Build binary failed!")
@@ -251,9 +251,9 @@ def run_ndk_build(flags):
 def run_cargo(cmds, triple="aarch64-linux-android"):
     env = os.environ.copy()
     env["PATH"] = f'{rust_bin}{os.pathsep}{env["PATH"]}'
-    env["CARGO_BUILD_RUSTC"] = op.join(rust_bin, "rustc" + EXE_EXT)
+    env["CARGO_BUILD_RUSTC"] = op.join(rust_bin, f"rustc{EXE_EXT}")
     env["RUSTFLAGS"] = "-Clinker-plugin-lto"
-    env["TARGET_CC"] = op.join(llvm_bin, "clang" + EXE_EXT)
+    env["TARGET_CC"] = op.join(llvm_bin, f"clang{EXE_EXT}")
     env["TARGET_CFLAGS"] = f"--target={triple}23"
     return execv([cargo, *cmds], env)
 
@@ -278,9 +278,7 @@ def run_cargo_build(args):
     if not args.verbose:
         cmds.append("-q")
 
-    cmds.append("--target")
-    cmds.append("")
-
+    cmds.extend(("--target", ""))
     for arch, triple in zip(archs, triples):
         rust_triple = (
             "thumbv7neon-linux-androideabi" if triple.startswith("armv7") else triple
@@ -477,7 +475,7 @@ def build_apk(args, module):
         [
             gradlew,
             f"{module}:assemble{build_type}",
-            "-PconfigPath=" + op.abspath(args.config),
+            f"-PconfigPath={op.abspath(args.config)}",
         ],
         env=env,
     )
@@ -490,7 +488,7 @@ def build_apk(args, module):
     source = op.join(module, "build", "outputs", "apk", build_type, apk)
     target = op.join(config["outdir"], apk)
     mv(source, target)
-    header("Output: " + target)
+    header(f"Output: {target}")
 
 
 def build_app(args):
@@ -623,7 +621,7 @@ def patch_avd_ramdisk(args):
     header("* Patching emulator ramdisk.img")
 
     # Create a backup to prevent accidental overwrites
-    backup = args.ramdisk + ".bak"
+    backup = f"{args.ramdisk}.bak"
     if not op.exists(backup):
         cp(args.ramdisk, backup)
 
@@ -634,7 +632,7 @@ def patch_avd_ramdisk(args):
     # Need to turn off system as root
     if "SystemAsRoot = on" in adv_ft:
         # Create a backup
-        cp(ini, ini + ".bak")
+        cp(ini, f"{ini}.bak")
         adv_ft = adv_ft.replace("SystemAsRoot = on", "SystemAsRoot = off")
         with open(ini, "w") as f:
             f.write(adv_ft)
